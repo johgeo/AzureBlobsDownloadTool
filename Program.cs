@@ -14,6 +14,7 @@ namespace AzureBlobsDownload
         private static string _blobsContainer = "mysitemedia";
         private static string _basePath = @"c:\temp\mysitemedia\";
         private static string _currentLocalPath =  _basePath;
+        private static BlobContainerItem[] _availableBlobContainers;
         private static readonly Stopwatch Stopwatch = new Stopwatch();
         private static int _blobCount = 0;
         private static int _skippedCount = 0;
@@ -23,9 +24,17 @@ namespace AzureBlobsDownload
         {
             try
             {
-                Menu();
                 Stopwatch.Start();
+
+                SetConnectionString();
+
                 var blobServiceClient = new BlobServiceClient(_connectionString);
+
+                SetBasePath();
+
+                _availableBlobContainers = blobServiceClient.GetBlobContainers().AsPages().SelectMany(p => p.Values).ToArray();
+                SetBlobContainerFolder();
+
                 var blobContainer = blobServiceClient.GetBlobContainerClient(_blobsContainer);
                 var blobs = blobContainer.GetBlobs(BlobTraits.All);
                 _blobCount = blobs.Count();
@@ -93,27 +102,45 @@ namespace AzureBlobsDownload
             return false;
         }
 
-        private static void Menu()
+        private static void SetBlobContainerFolder()
+        {
+            Console.WriteLine("Available containers:");
+            Console.WriteLine();
+            foreach (var blobContainer in _availableBlobContainers)
+            {
+                Console.WriteLine(blobContainer.Name);
+            }
+            Console.WriteLine();
+            Console.Write($"Set azure blob container, (will default to {_blobsContainer} if field is left empty): ");
+            var blobsContainer = Console.ReadLine();
+            _blobsContainer = string.IsNullOrWhiteSpace(blobsContainer) ? _blobsContainer : blobsContainer.Trim();
+            Console.WriteLine();
+        }
+
+        private static void SetBasePath()
         {
             Console.Write($@"Set base path to local folder, (will default to {_basePath} if field is left empty): ");
             var basePath = Console.ReadLine();
             _basePath = string.IsNullOrWhiteSpace(basePath) ? _basePath : basePath.Trim();
+            Console.WriteLine();
+        }
 
-            Console.Write($@"Set azure blob container, (will default to {_blobsContainer} if field is left empty): ");
-            var blobsContainer = Console.ReadLine();
-            _blobsContainer = string.IsNullOrWhiteSpace(blobsContainer) ? _blobsContainer : blobsContainer.Trim();
-
+        private static void SetConnectionString()
+        {
             Console.Write("Azure blob storage connection string (EPiServerAzureBlobs from Diagnostics tool): ");
             var connectionString = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 throw new ArgumentNullException($"connection string cannot be empty");
             }
+
             if (connectionString.Trim().Last().Equals(';'))
             {
                 connectionString = connectionString.Substring(0, connectionString.Length - 1);
             }
+
             _connectionString = connectionString.Trim();
+            Console.WriteLine();
         }
     }
 }
